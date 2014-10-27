@@ -1,5 +1,21 @@
 {
   "name": "dpd-imgix",
   "version": "0.0.1",
-  "dependencies": {}
+  "dependencies": {},
+  "description": "dpd-imgix =========",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joliveira87/dpd-imgix.git"
+  },
+  "keywords": [
+    "deploud;",
+    "imgix;"
+  ],
+  "author": "João Oliveira",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/joliveira87/dpd-imgix/issues"
+  },
+  "homepage": "https://github.com/joliveira87/dpd-imgix"
 }
