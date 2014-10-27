@@ -1,6 +1,6 @@
 {
   "name": "dpd-imgix",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "dependencies": {},
   "description": "dpd-imgix =========",
   "main": "index.js",
