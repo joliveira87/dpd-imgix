@@ -6,14 +6,15 @@ var Resource = require('deployd/lib/resource');
 var util = require('util');
 var path = require('path');
 var async = require('async');
-var crypto = require('crypto');
+var urlParser = require("url");
+var crypto = require("crypto");
 
 /**
  * Module setup.
  */
 
 function Imgix( options ) {
-	Resource.apply(this, arguments);
+  Resource.apply(this, arguments);
 }
 
 util.inherits(Imgix, Resource);
@@ -22,16 +23,16 @@ Imgix.prototype.clientGeneration = true;
 
 Imgix.basicDashboard = {
 
-	settings: [{
-		"name": "Domain",
-		"type": "text",
-		"description": "Imgix Domain"
-	},
-	{
-		"name": "Token",
-		"type": "text",
-		"description": "Secure Url Token"
-	}]
+  settings: [{
+    "name": "Domain",
+    "type": "text",
+    "description": "Imgix Domain"
+  },
+  {
+    "name": "Token",
+    "type": "text",
+    "description": "Secure Url Token"
+  }]
 
 };
 
@@ -39,96 +40,113 @@ Imgix.basicDashboard = {
  * Module methodes
  */
 
-Imgix.prototype.handle = function ( ctx, next ) {
+Imgix.prototype.handle = function (ctx, next) {
 
-	// just accepts one post 
-	if ( ctx.req && ctx.req.method !== 'POST' ) {
-		return next();
-	}
+  // just accepts one post 
+  if ( ctx.req && ctx.req.method !== 'POST' ) {
+    return next();
+  }
 
-	var options = ctx.body;
-	console.log("CONFIGURATIONS");
-	console.log(this.config);
-	console.log("OPTIONS");
-	console.log(options);
+  var options = ctx.body;
 
-	return ctx.done(null, {"message" : "This is working man!!!"});
-  // if ( !ctx.req.internal && this.config.internalOnly ) {
-  //   return ctx.done({ statusCode: 403, message: 'Forbidden' });
-  // }
+  if (!this.config.Domain || !this.config.Token)
+    return ctx.done("Domain or Token not defined");
 
-  // var options = ctx.body || {};
-  // options.from = options.from || this.config.defaultFromAddress;
-  // options.template = options.template || this.config.defaultTemplate;
+  if (!options && !options.photo && !options.photos)
+    return ctx.done(null, {"data" : {}});
 
-  // var errors = {};
-  // if ( !options.to ) {
-  //   errors.to = '\'to\' is required';
-  // }
-  // if ( !options.from ) {
-  //   errors.from = '\'from\' is required';
-  // }
-  // if ( !options.text ) {
-  //   errors.text = '\'text\' is required';
-  // }
-  // if ( Object.keys(errors).length ) {
-  //   return ctx.done({ statusCode: 400, errors: errors });
-  // }
+  if (options.photos && (!options.photos[0] || (typeof options.photos[0] !== "string")))
+    return ctx.done(null, {"data" : {}});
 
-  // var that = this;
+  if (options.photo && typeof options.photo !== "string")
+    return ctx.done(null, {"data" : {}});
 
-  // async.waterfall([
-  //   function ( callback ) {
-  //     if ( options.template ) {
-  //       return emailTemplates( templatesDir, callback );
-  //     }
-  //     callback( null, null );
-  //   },
-  //   function ( template, callback ) {
-  //     if ( template ) {
-  //       return template( options.template, options.locals, callback );
-  //     }
-  //     callback( null, null, null );
-  //   }
-  // ],
-  // function( err, html, text ) {
-  //   if ( err ) {
-  //     console.log( err );
-  //   }
-  //   if ( html ) {
-  //     options.html = html;
-  //   }
-  //   if ( text ) {
-  //     // grab text from templating engine
-  //     options.text = text;
-  //   }
+  if (!options.properties) options.properties = {};
 
-  //   if ( that.config.productionOnly && that.options.server.options.env == 'development' ) {
-  //     console.log();
-  //     console.log('Sent email:');
-  //     console.log('From:    ', options.from);
-  //     console.log('To:      ', options.to);
-  //     console.log('Subject: ', options.subject);
-  //     console.log('Text:');
-  //     console.log( options.text );
-  //     console.log('HTML:');
-  //     console.log( options.html );
-  //     return ctx.done( null, { message : 'Simulated sending' } );
-  //   }
+  var result;
 
-  //   that.transport.sendMail(
-  //     options,
-  //     function( err, response ) {
-  //       if ( err ) {
-  //         return ctx.done( err );
-  //       }
-  //       ctx.done( null, { message : response.message } );
-  //     }
-  //   );
+  if (options.photo) {
+  
+    result = imgixUrl(this.config.Token, this.config.Domain, options.photo, options.properties);
+  
+  } else if (options.photos) {
 
-  // });
+    result = [];
+
+    for (var i = 0; i < options.photos.length; i++) {
+      result.push(imgixUrl(this.config.Token, this.config.Domain, options.photos[i], options.properties));
+    }
+
+  }
+
+  return ctx.done(null, {"data" : result});
 
 };
+
+/**
+ * imgixUrl
+ * create imgix url
+ */
+
+function imgixUrl (token, host, photo, options) {
+
+  var query = arrangeOptions(options);
+
+  var url = host + photo + query;
+
+  return generateSignUrl(token, url);
+
+}
+
+/**
+ * arrangeOptions
+ * form one query string according to the properties used
+ *
+ * {param} Object options
+ */
+
+function arrangeOptions (options) {
+
+  var query = "";
+
+  if (!options || (typeof options !== "object")) return query;
+
+  if (Object.keys(options).length > 0)
+    query = "?";
+
+  for (var key in options)
+    query += key + "=" + options[key] + "&";
+
+  query = query.slice(0, -1);
+
+  return query;
+
+}
+
+/**
+ * generateSignUrl
+ * generates the signed imgix url
+ */
+
+function generateSignUrl (token, url) {
+
+  // parse url
+  var parsedUrl = urlParser.parse(url, true, true);
+
+  // Build the signing value
+  var signvalue = token + parsedUrl.path;
+
+  // Calculate MD5 of the signing value.
+  var signature = crypto.createHash('md5').update(signvalue).digest('hex');
+  // var signature = md5Hash.digest("hex");
+
+  // Determine the delimiter for appending the signature.
+  var delimiter = parsedUrl.search ? "&" : "?";
+
+  // Add the signature to the url and return.
+  return url + delimiter + "s=" + signature;
+
+}
 
 /**
  * Module export
